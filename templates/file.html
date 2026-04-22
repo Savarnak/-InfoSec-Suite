@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>InfoSec Suite — File Integrity</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 36px 16px 60px; color: #e0e0e0;
+    }
+    .header { text-align: center; margin-bottom: 28px; }
+    .header h1 { font-size: 2rem; font-weight: 700; color: #fff; letter-spacing: 1px; }
+    .header p  { color: #999; margin-top: 6px; font-size: 0.9rem; }
+
+    .nav {
+      display: flex; gap: 8px; margin-bottom: 28px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px; padding: 6px;
+    }
+    .nav a {
+      padding: 10px 24px; border-radius: 10px; font-size: 0.9rem;
+      font-weight: 600; text-decoration: none; color: #aaa;
+      transition: background 0.2s, color 0.2s;
+    }
+    .nav a.active { background: linear-gradient(135deg,#7c6ff7,#5a4fcf); color: #fff; }
+    .nav a:hover:not(.active) { background: rgba(255,255,255,0.07); color: #fff; }
+
+    .card {
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px; padding: 36px 40px;
+      width: 100%; max-width: 700px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+
+    .form-group { margin-bottom: 18px; }
+    .form-group label {
+      display: block; font-size: 0.83rem; color: #aaa;
+      margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    .drop-zone {
+      border: 2px dashed rgba(124,111,247,0.4);
+      border-radius: 14px; padding: 32px 20px;
+      text-align: center; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: #7c6ff7;
+      background: rgba(124,111,247,0.06);
+    }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0;
+      cursor: pointer; width: 100%; height: 100%;
+    }
+    .drop-icon { font-size: 2rem; margin-bottom: 8px; }
+    .drop-text { font-size: 0.9rem; color: #aaa; }
+    .drop-text span { color: #7c6ff7; font-weight: 600; }
+    .file-selected { font-size: 0.82rem; color: #51cf66; margin-top: 8px; }
+
+    .hash-input {
+      width: 100%; padding: 12px 16px; border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.07); color: #fff;
+      font-size: 0.88rem; font-family: 'Courier New', monospace;
+      outline: none; transition: border 0.2s;
+    }
+    .hash-input::placeholder { color: #555; }
+    .hash-input:focus { border-color: #7c6ff7; }
+
+    .btn {
+      width: 100%; padding: 14px;
+      background: linear-gradient(135deg,#7c6ff7,#5a4fcf);
+      color: #fff; border: none; border-radius: 12px;
+      font-size: 0.95rem; font-weight: 600; cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(124,111,247,0.5); }
+
+    .error-msg {
+      background: rgba(255,100,100,0.12); border: 1px solid rgba(255,100,100,0.3);
+      color: #ff8080; padding: 12px 16px; border-radius: 10px;
+      margin-bottom: 16px; font-size: 0.9rem;
+    }
+
+    .result-banner {
+      border-radius: 14px; padding: 20px 24px; margin-bottom: 20px;
+      display: flex; align-items: center; gap: 16px;
+      animation: fadeUp 0.4s ease;
+    }
+    .result-banner.verified  { background: rgba(81,207,102,0.08); border: 1px solid rgba(81,207,102,0.25); }
+    .result-banner.tampered  { background: rgba(255,80,80,0.1);   border: 1px solid rgba(255,80,80,0.3); }
+    .result-banner.generated { background: rgba(124,111,247,0.08); border: 1px solid rgba(124,111,247,0.25); }
+    .result-icon { font-size: 2.4rem; line-height: 1; }
+    .result-text h2 { font-size: 1.2rem; font-weight: 700; }
+    .result-banner.verified  .result-text h2 { color: #51cf66; }
+    .result-banner.tampered  .result-text h2 { color: #ff6b6b; }
+    .result-banner.generated .result-text h2 { color: #a78bfa; }
+    .result-text p { font-size: 0.83rem; color: #999; margin-top: 4px; }
+
+    .hash-box {
+      background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px; padding: 16px 18px; margin-bottom: 20px;
+      animation: fadeUp 0.45s ease;
+    }
+    .hash-box label {
+      font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;
+      color: #666; display: block; margin-bottom: 8px;
+    }
+    .hash-value {
+      font-family: 'Courier New', monospace; font-size: 0.82rem;
+      color: #a78bfa; word-break: break-all; line-height: 1.6;
+    }
+    .copy-btn {
+      margin-top: 10px; padding: 6px 14px; font-size: 0.78rem;
+      background: rgba(124,111,247,0.15); border: 1px solid rgba(124,111,247,0.3);
+      color: #a78bfa; border-radius: 8px; cursor: pointer; transition: background 0.2s;
+    }
+    .copy-btn:hover { background: rgba(124,111,247,0.25); }
+
+    .risk-section { margin-bottom: 20px; }
+    .risk-label { display: flex; justify-content: space-between; font-size: 0.83rem; color: #bbb; margin-bottom: 8px; }
+    .risk-pct { font-weight: 700; font-size: 1rem; }
+    .risk-lvl { font-size: 0.78rem; padding: 2px 10px; border-radius: 99px; font-weight: 600; }
+    .risk-lvl.LOW    { background: rgba(81,207,102,0.15); color: #51cf66; }
+    .risk-lvl.MEDIUM { background: rgba(255,200,60,0.15); color: #ffd43b; }
+    .risk-lvl.HIGH   { background: rgba(255,80,80,0.15);  color: #ff6b6b; }
+    .progress-track { height: 12px; background: rgba(255,255,255,0.07); border-radius: 99px; overflow: hidden; }
+    .progress-fill  { height: 100%; border-radius: 99px; transition: width 0.6s ease; }
+    .progress-fill.verified  { background: linear-gradient(90deg,#43e97b,#38f9d7); }
+    .progress-fill.tampered  { background: linear-gradient(90deg,#ff9a3c,#ff4d4d); }
+    .progress-fill.generated { background: linear-gradient(90deg,#a78bfa,#7c6ff7); }
+
+    .decision-box {
+      border-radius: 12px; padding: 14px 18px; margin-bottom: 20px;
+      font-size: 0.9rem; font-weight: 600; animation: fadeUp 0.5s ease;
+    }
+    .decision-box.allow { background: rgba(81,207,102,0.1); border: 1px solid rgba(81,207,102,0.3); color: #51cf66; }
+    .decision-box.warn  { background: rgba(255,212,59,0.1); border: 1px solid rgba(255,212,59,0.3); color: #ffd43b; }
+    .decision-box.block { background: rgba(255,80,80,0.1);  border: 1px solid rgba(255,80,80,0.3);  color: #ff6b6b; }
+
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
+    .info-card {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px; padding: 14px 16px;
+    }
+    .ic-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: #666; margin-bottom: 6px; }
+    .ic-value { font-size: 0.9rem; font-weight: 600; color: #ddd; }
+
+    .progress-pct-15  { width: 15%; }
+    .progress-pct-30  { width: 30%; }
+    .progress-pct-90  { width: 90%; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>🛡️ InfoSec Suite</h1>
+    <p>Phishing Detection · File Integrity · Risk Decision Engine</p>
+  </div>
+
+  <nav class="nav">
+    <a href="/">🔗 URL Scanner</a>
+    <a href="/file-check" class="active">📁 File Upload Check</a>
+  </nav>
+
+  <div class="card">
+    <form method="POST" enctype="multipart/form-data">
+
+      <div class="form-group">
+        <label>Upload File</label>
+        <div class="drop-zone" id="dropZone">
+          <input type="file" name="file" id="fileInput" required/>
+          <div class="drop-icon">📂</div>
+          <div class="drop-text">Drag &amp; drop or <span>browse file</span></div>
+          <div class="file-selected" id="fileLabel"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>
+          Expected SHA-256 Hash
+          <span style="color:#555;text-transform:none;font-size:0.78rem;letter-spacing:0;">
+            (optional — leave blank to just generate)
+          </span>
+        </label>
+        <input type="text" name="expected_hash" class="hash-input"
+               placeholder="e.g. a3f5c2d1b8e7... (64 hex characters)"/>
+      </div>
+
+      <button type="submit" class="btn">🔍 Verify Integrity</button>
+    </form>
+
+    {% if error %}
+      <div class="error-msg" style="margin-top:20px;">⚠️ {{ error }}</div>
+    {% endif %}
+
+    {% if file_result %}
+      <div style="margin-top:24px;">
+
+        <div class="result-banner {{ file_result }}">
+          <div class="result-icon">
+            {% if file_result == 'verified' %}✅
+            {% elif file_result == 'tampered' %}🚨
+            {% else %}🔑{% endif %}
+          </div>
+          <div class="result-text">
+            <h2>
+              {% if file_result == 'verified' %}File Integrity Verified
+              {% elif file_result == 'tampered' %}File Tampered / Mismatch
+              {% else %}Hash Generated{% endif %}
+            </h2>
+            <p>{{ message }}</p>
+          </div>
+        </div>
+
+        <div class="hash-box">
+          <label>Generated SHA-256 Hash</label>
+          <div class="hash-value" id="hashValue">{{ generated_hash }}</div>
+          <button type="button" class="copy-btn" onclick="copyHash()">📋 Copy Hash</button>
+        </div>
+
+        {% if risk_level %}
+          <div class="risk-section">
+            <div class="risk-label">
+              <span>Risk Score</span>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <span class="risk-lvl {{ risk_level }}">{{ risk_level }}</span>
+                <span class="risk-pct">
+                  {% if file_result == 'tampered' %}High
+                  {% elif file_result == 'verified' %}Low
+                  {% else %}Neutral{% endif %}
+                </span>
+              </div>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill {{ file_result }} {% if file_result == 'tampered' %}progress-pct-90{% elif file_result == 'verified' %}progress-pct-15{% else %}progress-pct-30{% endif %}"></div>
+            </div>
+          </div>
+
+          <div class="decision-box {{ decision }}">{{ decision_text }}</div>
+
+          {% if combined_reasons %}
+            <div style="margin-bottom:20px;">
+              <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;color:#666;margin-bottom:9px;">Security Analysis Reasons</div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                {% for r in combined_reasons %}
+                  <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:9px 13px;font-size:0.84rem;
+                              border-left:3px solid {{'#ff6b6b' if '🚨' in r else ('#ffd43b' if '⚠️' in r else '#51cf66')}};">
+                    {{ r }}
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+
+        {% endif %}
+          <div class="info-card">
+            <div class="ic-label">File Name</div>
+            <div class="ic-value">{{ filename or '—' }}</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-label">Hash Algorithm</div>
+            <div class="ic-value">SHA-256</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-label">Integrity Status</div>
+            <div class="ic-value">
+              {% if file_result == 'verified' %}<span style="color:#51cf66">✅ Verified</span>
+              {% elif file_result == 'tampered' %}<span style="color:#ff6b6b">🚨 Tampered</span>
+              {% else %}<span style="color:#a78bfa">🔑 Hash Only</span>{% endif %}
+            </div>
+          </div>
+          <div class="info-card">
+            <div class="ic-label">Risk Level</div>
+            <div class="ic-value">
+              <span class="risk-lvl {{ risk_level }}">{{ risk_level }}</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    {% endif %}
+  </div>
+
+  <script>
+    document.getElementById('fileInput').addEventListener('change', function() {
+      document.getElementById('fileLabel').textContent =
+        this.files[0] ? '📄 ' + this.files[0].name : '';
+    });
+
+    const zone = document.getElementById('dropZone');
+    zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) {
+        document.getElementById('fileInput').files = e.dataTransfer.files;
+        document.getElementById('fileLabel').textContent = '📄 ' + e.dataTransfer.files[0].name;
+      }
+    });
+
+    function copyHash() {
+      const h = document.getElementById('hashValue').textContent.trim();
+      navigator.clipboard.writeText(h).then(() => {
+        const btn = document.querySelector('.copy-btn');
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => btn.textContent = '📋 Copy Hash', 2000);
+      });
+    }
+  </script>
+</body>
+</html>
